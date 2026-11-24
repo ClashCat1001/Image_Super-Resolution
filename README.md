@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Real-ESRGAN 本地批量超分网页
 
 这个项目提供一个本地网页前端和 Flask 服务端，用开源 `Real-ESRGAN` 对图片做批量超分，并把结果保存到当前目录下的 `Images_Output` 文件夹。
@@ -84,7 +83,3 @@ https://example.com/image-2.png
 - 使用有界读图预取与后台写图，让 I/O 与推理重叠；OpenCV 使用单线程，避免与 Torch 的多核推理争抢线程。模型缓存最多保留 3 个配置，推理后释放缓存推理器持有的图像张量，CUDA 缓存清理改为每批一次。
 - 同一服务进程的处理请求排队执行，避免共享推理器的输入/输出状态串扰、输出路径冲突及重复归档。请使用单个服务进程；线程锁不跨进程共享。
 - 在 Apple Silicon 上，若手动启用 Metal 且输出异常黑图，服务会自动切到 CPU，避免继续写出错误结果。
-=======
-# Image_Super-Resolution
-A light tool for image super-resolution powered by Real-ESRGAN, using Python to construct. Real-ESRGAN could be operated on website, through Flask service, on port 8000 by default. CPU, CUDA and Metal are supported for NVIDIA, AMD GPU and MacBook.
->>>>>>> 0845a3a8f6bf8a4bd0877104cf8ed0caacca2346
