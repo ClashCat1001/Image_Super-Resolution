@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Real-ESRGAN 批量超分工作台</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Local Real-ESRGAN</p>
+          <h1>批量图片超分工作台</h1>
+          <p class="hero-text">
+            上传多张图片、输入图片下载 URL，或直接扫描根目录中的 <code>{{ input_dir }}</code>，
+            选择倍率和降噪强度后使用本地服务调用开源 Real-ESRGAN 处理。
+            输出会保存到
+            <code>{{ output_dir }}</code>。
+          </p>
+        </div>
+        <div class="hero-note">
+          <span class="note-label">默认模型</span>
+          <strong>realesr-general-x4v3</strong>
+          <span class="note-muted">支持递归扫描输入目录、自动归档原图和 CUDA / Metal 加速</span>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="panel panel-form">
+          <form id="upscale-form">
+            <div class="source-switch">
+              <label class="source-card active" data-mode-card="upload">
+                <input type="radio" name="source_mode" value="upload" checked />
+                <span class="source-title">上传文件</span>
+                <small>从浏览器选择多张图片后直接处理</small>
+              </label>
+              <label class="source-card" data-mode-card="url">
+                <input type="radio" name="source_mode" value="url" />
+                <span class="source-title">下载 URL</span>
+                <small>每行一个图片链接，自动下载后超分</small>
+              </label>
+              <label class="source-card" data-mode-card="input-folder">
+                <input type="radio" name="source_mode" value="input-folder" />
+                <span class="source-title">Images_Input 目录</span>
+                <small>递归扫描子文件夹，自动跳过 Archive</small>
+              </label>
+            </div>
+
+            <div id="url-mode-info" class="url-info hidden">
+              <label for="image-urls" class="control-title">图片下载 URL</label>
+              <textarea
+                id="image-urls"
+                name="urls"
+                rows="6"
+                spellcheck="false"
+                autocapitalize="off"
+                autocomplete="off"
+                aria-describedby="url-hint"
+                placeholder="https://example.com/image-1.jpg&#10;https://example.com/image-2.png"
+                disabled
+              ></textarea>
+              <p id="url-hint" class="hint">多个 URL 直接换行分隔，每行一个，中间不加逗号等符号。支持 HTTP / HTTPS 图片直链，每批最多 100 个，单张不超过 50 MB、每批不超过 500 MB。</p>
+            </div>
+
+            <div class="upload-box">
+              <label for="files" class="upload-trigger">
+                <span>选择图片</span>
+                <small>支持批量上传 PNG / JPG / WEBP / BMP / TIFF</small>
+              </label>
+              <input id="files" name="files" type="file" accept="image/*" multiple />
+            </div>
+
+            <div id="folder-mode-info" class="folder-info hidden">
+              <div>
+                <strong>输入目录</strong>
+                <code>{{ input_dir }}</code>
+              </div>
+              <div>
+                <strong>归档目录</strong>
+                <code>{{ archive_dir }}</code>
+              </div>
+              <button id="refresh-folder" type="button" class="ghost-button">刷新目录扫描</button>
+            </div>
+
+            <div class="controls">
+              <label class="control-card">
+                <span class="control-title">倍率</span>
+                <select id="scale" name="scale">
+                  <option value="2">2x</option>
+                  <option value="3">3x</option>
+                  <option value="4" selected>4x</option>
+                </select>
+              </label>
+
+              <label class="control-card">
+                <span class="control-title">处理模式</span>
+                <select id="processing-mode" name="processing_mode" aria-describedby="processing-hint">
+                  <option value="standard" selected>标准超分</option>
+                  <option value="low">清晰原图 · 低处理</option>
+                </select>
+                <small id="processing-hint">标准模式按所选降噪等级处理。</small>
+              </label>
+
+              <label class="control-card">
+                <span class="control-title">降噪强度</span>
+                <input
+                  id="denoise-level"
+                  name="denoise_level"
+                  type="range"
+                  min="0"
+                  max="10"
+                  step="1"
+                  value="5"
+                />
+                <div class="range-meta">
+                  <span id="denoise-value">d5x</span>
+                  <small>0 = 最弱降噪，10 = 最强降噪</small>
+                </div>
+              </label>
+
+              <label class="control-card">
+                <span class="control-title">计算设备</span>
+                <select id="device-mode" name="device_mode">
+                  <option value="auto" selected>自动</option>
+                  <option value="cpu">CPU</option>
+                  <option value="cuda">CUDA</option>
+                  <option value="metal">Metal</option>
+                </select>
+                <div class="range-meta">
+                  <span id="runtime-hint">检测中</span>
+                  <small id="runtime-detail">正在读取本机可用设备。</small>
+                </div>
+              </label>
+            </div>
+
+            <div class="form-actions">
+              <button id="submit-button" type="submit">开始超分</button>
+              <p class="hint">
+                目录模式会把处理成功的原图移动到 <code>{{ archive_dir }}</code>，避免重复超分。
+              </p>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2>待处理列表</h2>
+            <span id="file-count">0 张图片</span>
+          </div>
+          <ul id="selected-files" class="file-list empty-state">
+            <li>还没有选择图片。</li>
+          </ul>
+        </section>
+
+        <section class="panel status-panel">
+          <div class="panel-header">
+            <h2>处理状态</h2>
+          </div>
+          <div id="status-box" class="status-box idle">
+            等待选择图片来源。处理完成后，结果会显示在下面并保存到本地输出目录。
+          </div>
+        </section>
+
+        <section class="panel result-panel">
+          <div class="panel-header">
+            <h2>输出结果</h2>
+          </div>
+          <div id="results" class="results-grid empty-state">
+            <p>暂无输出。</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </body>
+</html>

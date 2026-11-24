@@ -1,0 +1,12 @@
+.DS_Store
+.venv/
+__pycache__/
+*.pyc
+Images_Input/Archive/*
+!Images_Input/Archive/.gitkeep
+Images_Output/*
+!Images_Output/.gitkeep
+uploads/*
+!uploads/.gitkeep
+weights/*
+!weights/.gitkeep
